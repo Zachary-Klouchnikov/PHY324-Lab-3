@@ -1,0 +1,102 @@
+"""
+IMPORTS
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+
+from scipy.optimize import curve_fit
+
+plt.rc('text', usetex = True)
+plt.rc('font', family = 'serif')
+
+"""
+FUNCTIONS
+"""
+def linear_fit(x, m, b):
+    """A linear fit for curve fitting.
+    
+    Aeguments:
+        x -- The independent variable.
+        m -- The slope of the line.
+        b -- The y-intercept of the line.
+    """
+    
+    return m * x + b
+
+def reduced_chi_square(observed, expected, uncertainties, num_params):
+    """Calculates the reduced chi-square value of a data set.
+
+    Arguments:
+        observed -- array of observed values
+        expected -- array of expected values
+        uncertainties -- array of uncertainties in observed values
+        num_params -- number of fitted parameters
+    """
+
+    chi_squared = np.sum(((observed - expected) ** 2) / (uncertainties ** 2))
+    degrees_of_freedom = len(observed) - num_params
+
+    return chi_squared / degrees_of_freedom
+
+"""
+MAIN
+"""
+# Data
+frequency = np.array([0.027978, 0.025134, 0.023531, 0.021382, 0.019900, 0.038498, 0.036457, 0.034313, 0.039856, 0.069911, 0.072684, 0.074205, 0.076396, 0.079761]) # MHz
+current = np.array([0.396, 0.351, 0.329, 0.304, 0.289, 0.541, 0.515, 0.482, 0.557, 0.958, 0.990, 1.023, 1.045, 1.096]) # A
+
+# Sort Data
+frequency = np.sort(frequency)
+current = np.sort(current)
+
+# Converting units
+frequency = frequency * 1e6 # Mhz to Hz
+current = current / 2
+
+# Calculating the linear fit parameters, their errors, and goodness of fit
+popt, pcov = curve_fit(linear_fit, frequency, current, sigma = 0.001, absolute_sigma = True)
+reduced_chi_sq = reduced_chi_square(current, linear_fit(frequency, *popt), 0.001, len(popt))
+
+"Plotting Frequency vs Current"
+fig, axes = plt.subplots(nrows = 2, ncols = 1, sharex = True, gridspec_kw = {'hspace': 0, 'height_ratios': [2, 1]})
+
+# Plotting frequency vs current data, fitting line, and residuals
+axes[0].errorbar(frequency, current, xerr = 1, yerr = 0.001, fmt = 'o', alpha = 0.8, color = 'Teal')
+axes[0].plot(np.linspace(frequency.min(), frequency.max()), linear_fit(np.linspace(frequency.min(), frequency.max()), *popt), color = 'Purple', label = f"Linear Fit: $I = 6.7395\\cdot10^{{-6}}\\nu + {popt[1]:.3f}\ (\\chi_\\nu^2 = {reduced_chi_sq:.2f})$")
+
+axes[1].errorbar(frequency, current - linear_fit(frequency, *popt), xerr = 1, yerr = 0.001, fmt = 'o', alpha = 0.8, color = 'Teal')
+axes[1].axhline(0, color = 'Black', linestyle = '--')
+
+# Labels
+fig.suptitle("Frequency vs. Current", fontsize = 12)
+fig.supxlabel("Frequency (Hz)", fontsize = 12)
+
+axes[0].set_ylabel("Current (A)", fontsize = 12)
+axes[1].set_ylabel("Residuals (A)", fontsize = 12)
+
+axes[0].grid()
+axes[1].grid()
+
+axes[0].legend(fontsize = 12)
+
+plt.tight_layout()
+plt.savefig('Figures\\Frequency_Vs_Current.pdf')
+plt.show()
+
+# Calculating the gyromagnetic ratio
+mu = 4 * np.pi * (10 ** -7) # N/A^2
+n = 320 # Number of turns of the coil
+r = 0.0605 # Coil radius in m
+r_err = 0.00005 # Uncertainty in coil radius in m
+
+gamma = (1 / popt[0]) * (2 * np.pi * (0.8 ** -1.5) * (r / (mu * n)))
+gamma_err = np.sqrt(((1 / np.sqrt(np.diag(pcov))[0]) / (1 / popt[0])) ** 2 + ((r_err / r) ** 2)) * (2 * np.pi * (0.8 ** -1.5) * (1 / (mu * n)))
+
+# Calculating the Lande g-factor
+e = 1.60217663 * (10 ** -19) # C
+m = 9.1093837 * (10 ** -31) # kg
+g = gamma / (e / (2 * m)) * 1000
+g_err = gamma_err / (e / (2 * m)) * 1000
+
+print(g)
+print(g_err)
