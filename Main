@@ -98,5 +98,4 @@ m = 9.1093837 * (10 ** -31) # kg
 g = gamma / (e / (2 * m)) * 1000
 g_err = gamma_err / (e / (2 * m)) * 1000
 
-print(g)
-print(g_err)
+print(np.sqrt(np.diag(pcov)))
